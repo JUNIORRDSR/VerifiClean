@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Tema puente entre el arranque nativo y Compose. El color y la tipografía reales
+      viven en ui/theme/Theme.kt; esto sólo evita el flash blanco antes del primer
+      frame de Compose.
+    -->
+    <style name="Theme.VerifiClean" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

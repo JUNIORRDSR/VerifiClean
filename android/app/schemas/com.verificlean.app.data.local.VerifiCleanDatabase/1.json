@@ -1,0 +1,289 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "a8eb1ebc3680754ed82413866b4b7f0a",
+    "entities": [
+      {
+        "tableName": "visitas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `siteId` TEXT NOT NULL, `siteClienteId` TEXT NOT NULL, `siteNombreCliente` TEXT NOT NULL, `siteNombreSede` TEXT NOT NULL, `siteDireccion` TEXT NOT NULL, `siteLat` REAL NOT NULL, `siteLng` REAL NOT NULL, `siteRadioPermitidoMetros` REAL NOT NULL, `supervisorId` TEXT NOT NULL, `supervisorNombre` TEXT NOT NULL, `estado` TEXT NOT NULL, `fechaAsignadaMillis` INTEGER NOT NULL, `completadaEnMillis` INTEGER, `evidenciaCount` INTEGER NOT NULL, `tieneSospechosas` INTEGER NOT NULL, `checklistJson` TEXT NOT NULL, `observaciones` TEXT, `actualizadoEnMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteId",
+            "columnName": "siteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteClienteId",
+            "columnName": "siteClienteId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteNombreCliente",
+            "columnName": "siteNombreCliente",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteNombreSede",
+            "columnName": "siteNombreSede",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteDireccion",
+            "columnName": "siteDireccion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteLat",
+            "columnName": "siteLat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteLng",
+            "columnName": "siteLng",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "siteRadioPermitidoMetros",
+            "columnName": "siteRadioPermitidoMetros",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supervisorId",
+            "columnName": "supervisorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supervisorNombre",
+            "columnName": "supervisorNombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fechaAsignadaMillis",
+            "columnName": "fechaAsignadaMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completadaEnMillis",
+            "columnName": "completadaEnMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "evidenciaCount",
+            "columnName": "evidenciaCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tieneSospechosas",
+            "columnName": "tieneSospechosas",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "checklistJson",
+            "columnName": "checklistJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observaciones",
+            "columnName": "observaciones",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "actualizadoEnMillis",
+            "columnName": "actualizadoEnMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_visitas_estado",
+            "unique": false,
+            "columnNames": [
+              "estado"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_visitas_estado` ON `${TABLE_NAME}` (`estado`)"
+          },
+          {
+            "name": "index_visitas_fechaAsignadaMillis",
+            "unique": false,
+            "columnNames": [
+              "fechaAsignadaMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_visitas_fechaAsignadaMillis` ON `${TABLE_NAME}` (`fechaAsignadaMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "evidencias_pendientes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`clienteEvidenciaId` TEXT NOT NULL, `ownerUid` TEXT NOT NULL, `visitId` TEXT NOT NULL, `visitaNombreSede` TEXT NOT NULL, `rutaArchivoCifrado` TEXT NOT NULL, `hashSHA256` TEXT NOT NULL, `lat` REAL, `lng` REAL, `precisionMetros` REAL, `mockLocationReportada` INTEGER NOT NULL, `integrityToken` TEXT, `capturadoEnMillis` INTEGER NOT NULL, `checklistJson` TEXT NOT NULL, `estado` TEXT NOT NULL, `intentos` INTEGER NOT NULL, `ultimoError` TEXT, PRIMARY KEY(`clienteEvidenciaId`))",
+        "fields": [
+          {
+            "fieldPath": "clienteEvidenciaId",
+            "columnName": "clienteEvidenciaId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerUid",
+            "columnName": "ownerUid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visitId",
+            "columnName": "visitId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visitaNombreSede",
+            "columnName": "visitaNombreSede",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rutaArchivoCifrado",
+            "columnName": "rutaArchivoCifrado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hashSHA256",
+            "columnName": "hashSHA256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "lng",
+            "columnName": "lng",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "precisionMetros",
+            "columnName": "precisionMetros",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "mockLocationReportada",
+            "columnName": "mockLocationReportada",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "integrityToken",
+            "columnName": "integrityToken",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "capturadoEnMillis",
+            "columnName": "capturadoEnMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "checklistJson",
+            "columnName": "checklistJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intentos",
+            "columnName": "intentos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ultimoError",
+            "columnName": "ultimoError",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "clienteEvidenciaId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_evidencias_pendientes_visitId",
+            "unique": false,
+            "columnNames": [
+              "visitId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidencias_pendientes_visitId` ON `${TABLE_NAME}` (`visitId`)"
+          },
+          {
+            "name": "index_evidencias_pendientes_estado",
+            "unique": false,
+            "columnNames": [
+              "estado"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidencias_pendientes_estado` ON `${TABLE_NAME}` (`estado`)"
+          },
+          {
+            "name": "index_evidencias_pendientes_ownerUid",
+            "unique": false,
+            "columnNames": [
+              "ownerUid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidencias_pendientes_ownerUid` ON `${TABLE_NAME}` (`ownerUid`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a8eb1ebc3680754ed82413866b4b7f0a')"
+    ]
+  }
+}

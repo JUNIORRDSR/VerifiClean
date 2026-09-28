@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifiesto exclusivo de la variante debug. Se fusiona con el principal y sólo añade la
+  configuración de red que permite HTTP en claro hacia el backend local. La variante
+  release no lo ve, así que sigue siendo HTTPS-only.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:replace="android:networkSecurityConfig" />
+
+</manifest>

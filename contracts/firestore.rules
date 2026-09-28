@@ -1,0 +1,90 @@
+rules_version = '2';
+
+// VerifiClean — reglas restrictivas por rol.
+//
+// Modelo de acceso: la app Android NO escribe en Firestore. Todo pasa por la API
+// en Cloud Run, que usa el Admin SDK y por tanto ignora estas reglas. Esto es
+// deliberado: las validaciones antifraude (hash, geocerca, Play Integrity, timestamp
+// de servidor) sólo tienen sentido server-side.
+//
+// Entonces, ¿para qué existen estas reglas? Como segunda línea de defensa: si mañana
+// alguien añade el SDK de Firestore al cliente, o si se filtra un token de Firebase
+// Auth, el daño posible queda acotado a lectura de lo propio. Por defecto: denegar.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function perfil() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function esAdmin() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && perfil().rol == 'admin'
+        && perfil().activo == true;
+    }
+
+    function esSupervisorActivo() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && perfil().rol == 'supervisor'
+        && perfil().activo == true;
+    }
+
+    // users: cada quien lee su propio perfil. El admin lee todos.
+    // Escritura: sólo el backend (Admin SDK). Nadie desde el cliente, ni el admin
+    // — un cliente que pueda escribir `rol` se auto-promueve.
+    match /users/{uid} {
+      allow get: if autenticado() && (request.auth.uid == uid || esAdmin());
+      allow list: if esAdmin();
+      allow write: if false;
+    }
+
+    // sites: lectura para cualquier usuario activo (el supervisor necesita lat/lng
+    // y el radio). Escritura sólo backend.
+    match /sites/{siteId} {
+      allow read: if esAdmin() || esSupervisorActivo();
+      allow write: if false;
+    }
+
+    // visits: el supervisor sólo ve las suyas. El admin ve todas.
+    match /visits/{visitId} {
+      allow get: if esAdmin()
+        || (esSupervisorActivo() && resource.data.supervisorId == request.auth.uid);
+      // `list` no puede inspeccionar documentos aún no leídos: se exige que la
+      // consulta venga filtrada por supervisorId, si no se deniega.
+      allow list: if esAdmin()
+        || (esSupervisorActivo()
+            && request.query.limit <= 200
+            && 'supervisorId' in request.query.where);
+      allow write: if false;
+    }
+
+    // evidences: sólo el admin lee directamente. El supervisor las ve a través de
+    // la API, embebidas en el detalle de su visita — no necesita acceso crudo, y
+    // dárselo le permitiría enumerar hashes ajenos para clonarlos.
+    match /evidences/{evidenceId} {
+      allow read: if esAdmin();
+      allow write: if false;
+    }
+
+    // hashesEvidencia: colección de control con un documento por hash de imagen. Se deja
+    // explícitamente cerrada, aunque la regla de abajo ya lo haría, porque el motivo
+    // importa: si un supervisor pudiera leerla, comprobaría si el hash de una foto ya está
+    // registrado ANTES de intentar subirla, y con eso encontraría por prueba y error una
+    // imagen que pase el filtro de duplicados.
+    match /hashesEvidencia/{hash} {
+      allow read, write: if false;
+    }
+
+    // Cualquier colección futura: denegada hasta que se decida explícitamente.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

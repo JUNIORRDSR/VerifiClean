@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sólo variante debug. Desde targetSdk 28 Android bloquea el tráfico HTTP en claro, así
+  que sin esto la app de depuración no puede hablar con el backend local y falla con
+  `CLEARTEXT communication not permitted`.
+
+  Se permite exactamente el host del backend de desarrollo, no `cleartextTrafficPermitted`
+  global: si mañana alguien apunta la app de debug a un servidor real por HTTP, tiene que
+  fallar igual que en producción.
+
+  10.0.2.2  → la máquina anfitriona vista desde el emulador
+  localhost → adb reverse (`adb reverse tcp:8080 tcp:8080`) en dispositivo físico
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

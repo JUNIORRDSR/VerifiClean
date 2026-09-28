@@ -1,0 +1,1061 @@
+openapi: 3.0.3
+
+info:
+  title: VerifiClean API
+  version: 1.0.0
+  description: |
+    API de validación de visitas de supervisión de aseo.
+
+    **Contrato compartido.** El backend (`backend/src/domain/schemas.ts`) y la app
+    Android (`android/app/src/main/java/com/verificlean/app/data/remote/dto/`)
+    son espejos de este archivo. Cambiar aquí obliga a cambiar en los dos lados.
+
+    ## Autenticación
+    Todo endpoint salvo `/v1/health` exige `Authorization: Bearer <idToken>`, donde
+    `idToken` es un ID token de Firebase Authentication obtenido por el SDK cliente.
+    El servidor lo verifica con el Admin SDK y resuelve el rol leyendo `users/{uid}`.
+
+    ## Tiempo
+    Todos los timestamps que devuelve el servidor son ISO-8601 UTC generados por el
+    servidor. Los timestamps que manda el cliente se guardan sólo como auditoría y
+    nunca deciden nada.
+
+    ## Dos vistas: supervisor y admin
+
+    **El supervisor nunca recibe el veredicto antifraude de sus propias evidencias.**
+    Ni `esSospechosa`, ni `motivosAlerta`, ni `distanciaAlSitioMetros`, ni `hashSHA256`,
+    ni `tieneSospechosas`.
+
+    No es una omisión por ahorrar bytes. El servidor marca las evidencias dudosas pero
+    nunca las rechaza, precisamente para no darle al defraudador un oráculo con el que
+    ajustar y reintentar. Devolver el veredicto en el cuerpo de un 201 sería el mismo
+    oráculo con otra ropa: probar una ubicación, leer "FUERA_DE_GEOFENCE", acercarse y
+    repetir hasta que salga limpio.
+
+    Todo veredicto vive bajo `/v1/admin`. Ver `docs/ANTIFRAUD.md`.
+
+    ## Cabeceras
+
+    - `X-Device-Id` (opcional): huella del dispositivo. Si no coincide con la registrada
+      para el supervisor, la evidencia se marca `DISPOSITIVO_NO_VINCULADO`.
+    - `Idempotency-Key` (UUID, obligatoria en altas de sede y asignación): identifica un
+      intento. Repetir la misma clave y carga devuelve el recurso original; reutilizar la
+      clave con otra carga devuelve `409`.
+
+    ## Paginación
+
+    `cursor` es una cadena **opaca**. Se toma tal cual del `siguienteCursor` de la
+    respuesta anterior y no debe construirse ni interpretarse en el cliente: su formato
+    interno puede cambiar sin aviso.
+
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local
+  - url: https://verificlean-api-{hash}-uc.a.run.app
+    description: Cloud Run
+    variables:
+      hash:
+        default: xxxxxxxxxx
+
+security:
+  - firebaseAuth: []
+
+tags:
+  - name: auth
+  - name: visits
+    description: Rol supervisor
+  - name: admin
+    description: Rol admin
+  - name: catalogo
+    description: Alta de sitios y usuarios (rol admin)
+
+paths:
+  /v1/health:
+    get:
+      tags: [auth]
+      summary: Liveness probe para Cloud Run
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, version]
+                properties:
+                  ok: { type: boolean, example: true }
+                  version: { type: string, example: '1.0.0' }
+
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Canjear un ID token de Firebase por el perfil de sesión
+      description: |
+        Firebase Auth ya autentica en el cliente; este endpoint **no** valida
+        contraseñas. Existe para tres cosas que el cliente no puede hacer solo:
+
+        1. Resolver el rol (`admin` | `supervisor`) sin darle al cliente permiso de
+           lectura sobre `users`.
+        2. Rechazar usuarios con `activo=false` en un solo viaje.
+        3. Registrar el primer `deviceId` del supervisor. Las peticiones posteriores lo
+           comparan en el servidor sin devolver el resultado al cliente.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken:
+                  type: string
+                  description: ID token de Firebase Authentication
+                deviceId:
+                  type: string
+                  nullable: true
+                  description: |
+                    Huella estable del dispositivo (ANDROID_ID + firma de la app).
+                    En el primer login se graba; después se compara.
+      responses:
+        '200':
+          description: Sesión válida
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [usuario]
+                properties:
+                  usuario: { $ref: '#/components/schemas/UsuarioSesion' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403':
+          description: Usuario inactivo o sin documento en `users`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/visits:
+    get:
+      tags: [visits]
+      summary: Bandeja de visitas del supervisor
+      description: |
+        Un supervisor sólo puede consultar las suyas: si `supervisorId` viene vacío
+        se usa el uid del token, y si viene con otro uid se responde 403. El admin
+        puede consultar las de cualquiera.
+      parameters:
+        - { name: supervisorId, in: query, schema: { type: string } }
+        - name: estado
+          in: query
+          schema: { $ref: '#/components/schemas/EstadoVisita' }
+        - { name: desde, in: query, schema: { type: string, format: date-time } }
+        - { name: hasta, in: query, schema: { type: string, format: date-time } }
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: |
+            Cadena opaca tomada del `siguienteCursor` de la respuesta anterior. No
+            construirla en el cliente.
+      responses:
+        '200':
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, siguienteCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/VisitaResumenSupervisor' }
+                  siguienteCursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /v1/visits/{id}:
+    get:
+      tags: [visits]
+      summary: Detalle de una visita
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Detalle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitaDetalleSupervisor' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /v1/visits/{id}/evidence:
+    post:
+      tags: [visits]
+      summary: Subir foto de evidencia con GPS, checklist y token de integridad
+      description: |
+        `multipart/form-data`. El servidor:
+
+        1. Calcula el SHA-256 sobre los bytes recibidos (no confía en el del cliente).
+        2. Calcula la distancia Haversine al sitio.
+        3. Verifica el token de Play Integrity.
+        4. Busca el hash en otras visitas.
+        5. Sella `timestampServidor`.
+
+        **Nunca rechaza por sospecha.** Una evidencia sospechosa se guarda con
+        `esSospechosa=true` y sus `motivosAlerta`; devolver 4xx le enseñaría al
+        defraudador qué ajustar hasta pasar el filtro. Los 4xx de aquí son sólo
+        errores de forma o de estado.
+
+        Idempotencia: `clienteEvidenciaId` es un UUID generado en el dispositivo. Si
+        llega dos veces (reintento de WorkManager tras un timeout que sí se procesó),
+        la segunda devuelve **200** con la evidencia ya creada en vez de duplicarla.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [foto, clienteEvidenciaId]
+              properties:
+                foto:
+                  type: string
+                  format: binary
+                  description: JPEG capturado con CameraX. Máx 8 MB.
+                clienteEvidenciaId:
+                  type: string
+                  format: uuid
+                  description: Clave de idempotencia generada en el dispositivo
+                lat: { type: number, format: double, nullable: true }
+                lng: { type: number, format: double, nullable: true }
+                precisionMetros: { type: number, format: double, nullable: true }
+                mockLocationReportada:
+                  type: boolean
+                  default: false
+                  description: '`Location.isMock` tal como lo reportó Android'
+                capturadoEn:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: Reloj del dispositivo. Sólo auditoría.
+                hashClienteReportado:
+                  type: string
+                  nullable: true
+                  description: SHA-256 que calculó el cliente. Sólo auditoría.
+                integrityToken:
+                  type: string
+                  nullable: true
+                  description: Token de Play Integrity API
+                checklist:
+                  type: string
+                  description: JSON con `ChecklistItem[]`, serializado (límite de multipart)
+            encoding:
+              foto: { contentType: image/jpeg }
+      responses:
+        '201':
+          description: |
+            Evidencia registrada. El cuerpo es **sólo confirmación**: el veredicto
+            antifraude no viaja al supervisor.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenciaConfirmacion' }
+        '200':
+          description: Reenvío idempotente — ya existía con ese `clienteEvidenciaId`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenciaConfirmacion' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: La visita ya está completada y no admite más evidencias
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413':
+          description: Foto por encima del límite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/visits/{id}/complete:
+    patch:
+      tags: [visits]
+      summary: Cerrar la visita
+      description: |
+        Exige al menos una evidencia y todos los ítems del checklist respondidos.
+        El servidor sella `completadaEn`. Reintentar sobre una visita ya completada
+        devuelve 200 con el mismo cuerpo (idempotente) — WorkManager reintenta.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checklist]
+              properties:
+                checklist:
+                  type: array
+                  items: { $ref: '#/components/schemas/ChecklistItem' }
+                observaciones: { type: string, nullable: true, maxLength: 2000 }
+      responses:
+        '200':
+          description: Visita completada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitaDetalleSupervisor' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Sin evidencias o con checklist incompleto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/admin/visits:
+    get:
+      tags: [admin]
+      summary: Dashboard de visitas con filtros
+      parameters:
+        - { name: siteId, in: query, schema: { type: string } }
+        - { name: supervisorId, in: query, schema: { type: string } }
+        - name: estado
+          in: query
+          schema: { $ref: '#/components/schemas/EstadoVisita' }
+        - name: sospechosas
+          in: query
+          schema: { type: boolean }
+          description: '`true` = sólo visitas con alguna evidencia marcada'
+        - { name: desde, in: query, schema: { type: string, format: date-time } }
+        - { name: hasta, in: query, schema: { type: string, format: date-time } }
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Lista paginada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, siguienteCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/VisitaResumen' }
+                  siguienteCursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /v1/admin/visits/{id}:
+    get:
+      tags: [admin]
+      summary: Detalle completo con evidencias y alertas
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Detalle con URLs firmadas de las fotos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitaDetalleAdmin' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /v1/admin/visits/{id}/alert-review:
+    patch:
+      tags: [admin]
+      summary: Registrar o reabrir la revisión administrativa de alertas
+      description: |
+        El servidor fija `revisadaPorId`, `revisadaPorNombre` y `revisadaEn` desde la
+        sesión autenticada. `justificada` y `escalada` exigen nota. Volver a `pendiente`
+        limpia autor, hora y nota. Una evidencia sospechosa nueva también reabre el caso
+        dentro de la misma transacción que registra la evidencia.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RevisionAlertaInput' }
+      responses:
+        '200':
+          description: Detalle administrativo actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitaDetalleAdmin' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /v1/admin/reports:
+    get:
+      tags: [admin]
+      summary: Reporte agregado por cliente y rango de fechas
+      parameters:
+        - { name: clienteId, in: query, required: true, schema: { type: string } }
+        - { name: desde, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: hasta, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Reporte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reporte' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+
+  /v1/sites:
+    get:
+      tags: [catalogo]
+      summary: Listar sedes
+      parameters:
+        - { name: clienteId, in: query, schema: { type: string } }
+        - { name: activo, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Sedes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Sitio' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+    post:
+      tags: [catalogo]
+      summary: Crear sede de cliente
+      description: |
+        Operación idempotente. La primera petición devuelve `201`; un reenvío con la misma
+        `Idempotency-Key` y la misma carga devuelve `200` y el mismo recurso. Reutilizar la
+        clave con otra carga devuelve `409`.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SitioNuevo' }
+      responses:
+        '200':
+          description: Reenvío idempotente; la sede ya había sido creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sitio' }
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sitio' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '409':
+          description: La clave ya se utilizó con otra carga
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/sites/{id}:
+    patch:
+      tags: [catalogo]
+      summary: Activar o desactivar una sede
+      description: |
+        Baja lógica. No existe `DELETE`: las visitas ya realizadas siguen citando la sede
+        y borrarla dejaría huérfano el histórico que prueba el cumplimiento.
+
+        Desactivar tiene un solo efecto: `POST /v1/visits/assign` la rechaza. Las visitas
+        ya asignadas siguen su curso, porque el supervisor puede estar de camino.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CambioActivo' }
+      responses:
+        '200':
+          description: Sede actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sitio' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /v1/users:
+    get:
+      tags: [catalogo]
+      summary: Listar usuarios
+      parameters:
+        - name: rol
+          in: query
+          schema: { $ref: '#/components/schemas/Rol' }
+      responses:
+        '200':
+          description: Usuarios
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+    post:
+      tags: [catalogo]
+      summary: Crear supervisor o admin
+      description: |
+        Crea el usuario en Firebase Authentication y su documento en `users` en el
+        mismo paso. Si la creación del documento falla, se borra el usuario de Auth
+        para no dejar cuentas huérfanas que puedan loguear sin rol.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsuarioNuevo' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '409':
+          description: El email ya existe
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/users/{id}:
+    patch:
+      tags: [catalogo]
+      summary: Activar o desactivar un usuario
+      description: |
+        Única forma de cortarle el acceso a alguien que deja la empresa. `exigirAuth`
+        comprueba `activo` en cada petición, así que surte efecto en la siguiente llamada
+        sin esperar a que caduque su token.
+
+        Su histórico no se toca: las evidencias que subió siguen siendo válidas y las
+        visitas que cerró siguen contando para el cumplimiento del cliente.
+
+        Un admin **no puede** cambiar el estado de su propia cuenta (`400`). Si además
+        fuera el único, no quedaría nadie capaz de reactivar a nadie.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CambioActivo' }
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /v1/visits/assign:
+    post:
+      tags: [catalogo]
+      summary: Asignar una visita a un supervisor
+      description: |
+        No estaba en el listado original de endpoints, pero sin él no hay forma de
+        que exista una visita: el supervisor sólo consume visitas ya creadas.
+        La primera petición devuelve `201`; un reenvío con la misma `Idempotency-Key` y
+        carga devuelve `200` y la misma visita. La misma clave con otra carga devuelve
+        `409`.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VisitaNueva' }
+      responses:
+        '200':
+          description: Reenvío idempotente; la visita ya había sido asignada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitaDetalleSupervisor' }
+        '201':
+          description: Asignada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisitaDetalleSupervisor' }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutorizado' }
+        '403': { $ref: '#/components/responses/Prohibido' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: La clave ya se utilizó con otra carga
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    firebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: ID token de Firebase Authentication
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        UUID generado por el cliente y conservado hasta recibir una respuesta exitosa.
+        Identifica la operación completa, no un intento de transporte.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    NoAutorizado:
+      description: Token ausente, mal formado o expirado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Prohibido:
+      description: Rol insuficiente o recurso de otro supervisor
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SolicitudInvalida:
+      description: Cuerpo o parámetros inválidos
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [codigo, mensaje]
+          properties:
+            codigo:
+              type: string
+              enum:
+                - SOLICITUD_INVALIDA
+                - NO_AUTORIZADO
+                - PROHIBIDO
+                - NO_ENCONTRADO
+                - CONFLICTO
+                - ARCHIVO_MUY_GRANDE
+                - ERROR_INTERNO
+            mensaje: { type: string }
+            detalles:
+              type: object
+              nullable: true
+              additionalProperties: true
+              description: Errores de validación campo a campo
+
+    Rol:
+      type: string
+      enum: [admin, supervisor]
+
+    EstadoVisita:
+      type: string
+      enum: [pendiente, en_progreso, completada]
+
+    RespuestaChecklist:
+      type: string
+      enum: [si, no, na]
+
+    MotivoAlerta:
+      type: string
+      enum:
+        - FUERA_DE_GEOFENCE
+        - IMAGEN_DUPLICADA
+        - DISPOSITIVO_NO_CONFIABLE
+        - MOCK_LOCATION
+        - PRECISION_GPS_BAJA
+        - DISPOSITIVO_NO_VINCULADO
+        - HASH_NO_COINCIDE
+        - INTEGRIDAD_NO_EVALUADA
+        - TOKEN_INTEGRIDAD_REUTILIZADO
+        - TOKEN_INTEGRIDAD_CADUCADO
+        - CHECKLIST_ALTERADO
+        - SIN_UBICACION
+
+    VeredictoIntegridad:
+      type: string
+      enum: [CONFIABLE, NO_CONFIABLE, NO_EVALUADO]
+
+    Usuario:
+      type: object
+      required: [id, nombre, email, rol, activo]
+      properties:
+        id: { type: string, description: uid de Firebase Auth }
+        nombre: { type: string }
+        email: { type: string, format: email, maxLength: 254 }
+        rol: { $ref: '#/components/schemas/Rol' }
+        activo: { type: boolean }
+        deviceId: { type: string, nullable: true }
+        creadoEn: { type: string, format: date-time }
+
+    UsuarioSesion:
+      type: object
+      description: |
+        Perfil mínimo devuelto al iniciar sesión. No contiene `deviceId` ni el resultado
+        de compararlo: cualquiera de esos datos permitiría al supervisor deducir si sus
+        evidencias activarán la alerta `DISPOSITIVO_NO_VINCULADO`.
+      required: [id, nombre, email, rol, activo]
+      properties:
+        id: { type: string, description: uid de Firebase Auth }
+        nombre: { type: string }
+        email: { type: string, format: email }
+        rol: { $ref: '#/components/schemas/Rol' }
+        activo: { type: boolean }
+        creadoEn: { type: string, format: date-time }
+
+    UsuarioNuevo:
+      type: object
+      required: [nombre, email, password, rol]
+      properties:
+        nombre: { type: string, minLength: 2, maxLength: 120 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        rol: { $ref: '#/components/schemas/Rol' }
+
+    Sitio:
+      type: object
+      required: [id, clienteId, nombreCliente, nombreSede, direccion, lat, lng, radioPermitidoMetros, activo]
+      properties:
+        id: { type: string }
+        clienteId: { type: string }
+        nombreCliente: { type: string }
+        nombreSede: { type: string }
+        direccion: { type: string }
+        lat: { type: number, format: double, minimum: -90, maximum: 90 }
+        lng: { type: number, format: double, minimum: -180, maximum: 180 }
+        radioPermitidoMetros:
+          type: number
+          minimum: 50
+          maximum: 2000
+          description: |
+            Mínimo 50 m: por debajo de eso el error típico de
+            PRIORITY_BALANCED_POWER_ACCURACY produce falsos positivos de fraude.
+        activo: { type: boolean }
+        creadoEn: { type: string, format: date-time }
+
+    SitioNuevo:
+      type: object
+      required: [clienteId, nombreCliente, nombreSede, direccion, lat, lng]
+      properties:
+        clienteId: { type: string, minLength: 1, maxLength: 64 }
+        nombreCliente: { type: string, minLength: 1, maxLength: 160 }
+        nombreSede: { type: string, minLength: 1, maxLength: 160 }
+        direccion: { type: string, minLength: 1, maxLength: 300 }
+        lat: { type: number, format: double, minimum: -90, maximum: 90 }
+        lng: { type: number, format: double, minimum: -180, maximum: 180 }
+        radioPermitidoMetros: { type: number, minimum: 50, maximum: 2000, default: 150 }
+
+    CambioActivo:
+      type: object
+      required: [activo]
+      description: |
+        Alta y baja lógica de sedes y usuarios. Nunca hay borrado: lo dado de baja sigue
+        apareciendo en las visitas y evidencias que ya produjo, que es el rastro de
+        auditoría que justifica el producto entero.
+      properties:
+        activo: { type: boolean }
+
+    ChecklistItem:
+      type: object
+      required: [id, pregunta, respuesta]
+      properties:
+        id: { type: string, description: 'Estable, ej. "banos"' }
+        pregunta: { type: string }
+        respuesta:
+          allOf: [{ $ref: '#/components/schemas/RespuestaChecklist' }]
+          nullable: true
+        nota: { type: string, nullable: true, maxLength: 500 }
+
+    VisitaNueva:
+      type: object
+      required: [siteId, supervisorId, fechaAsignada]
+      properties:
+        siteId: { type: string }
+        supervisorId: { type: string }
+        fechaAsignada: { type: string, format: date-time }
+        checklist:
+          type: array
+          description: Si se omite, se usa la plantilla por defecto del servidor
+          items: { $ref: '#/components/schemas/ChecklistItem' }
+
+    VisitaResumen:
+      type: object
+      description: |
+        Vista del **admin**. La del supervisor es idéntica salvo que omite
+        `tieneSospechosas`: con ese flag podría deducir el veredicto de sus evidencias.
+      required:
+        [id, siteId, siteNombreCliente, siteNombreSede, supervisorId, supervisorNombre,
+         estado, fechaAsignada, evidenciaCount, tieneSospechosas, revisionAlerta]
+      properties:
+        id: { type: string }
+        siteId: { type: string }
+        siteNombreCliente: { type: string }
+        siteNombreSede: { type: string }
+        siteClienteId: { type: string }
+        supervisorId: { type: string }
+        supervisorNombre: { type: string }
+        estado: { $ref: '#/components/schemas/EstadoVisita' }
+        fechaAsignada: { type: string, format: date-time }
+        completadaEn: { type: string, format: date-time, nullable: true }
+        evidenciaCount: { type: integer }
+        tieneSospechosas: { type: boolean }
+        revisionAlerta: { $ref: '#/components/schemas/RevisionAlerta' }
+
+    EstadoRevisionAlerta:
+      type: string
+      enum: [pendiente, revisada, justificada, escalada]
+
+    RevisionAlerta:
+      type: object
+      description: Memoria del caso, disponible únicamente en respuestas administrativas.
+      required: [estado, nota, revisadaPorId, revisadaPorNombre, revisadaEn]
+      properties:
+        estado: { $ref: '#/components/schemas/EstadoRevisionAlerta' }
+        nota: { type: string, maxLength: 1000, nullable: true }
+        revisadaPorId: { type: string, nullable: true }
+        revisadaPorNombre: { type: string, nullable: true }
+        revisadaEn: { type: string, format: date-time, nullable: true }
+
+    RevisionAlertaInput:
+      type: object
+      additionalProperties: false
+      required: [estado]
+      properties:
+        estado: { $ref: '#/components/schemas/EstadoRevisionAlerta' }
+        nota: { type: string, minLength: 1, maxLength: 1000, nullable: true }
+
+    VisitaResumenSupervisor:
+      type: object
+      description: |
+        Lo que ve el supervisor en su bandeja. **Sin `tieneSospechosas`**: ese campo es el
+        veredicto antifraude y devolvérselo es el mismo oráculo que rechazarle la subida.
+
+        Existe como esquema aparte y no como `VisitaResumen` con un campo opcional para
+        que la frontera antifraude esté expresada por tipos: un cliente generado desde este
+        contrato no puede leer un veredicto que su esquema no tiene.
+      required:
+        [id, siteId, siteNombreCliente, siteNombreSede, supervisorId, supervisorNombre,
+         estado, fechaAsignada, evidenciaCount]
+      properties:
+        id: { type: string }
+        siteId: { type: string }
+        siteNombreCliente: { type: string }
+        siteNombreSede: { type: string }
+        siteClienteId: { type: string }
+        supervisorId: { type: string }
+        supervisorNombre: { type: string }
+        estado: { $ref: '#/components/schemas/EstadoVisita' }
+        fechaAsignada: { type: string, format: date-time }
+        completadaEn: { type: string, format: date-time, nullable: true }
+        evidenciaCount: { type: integer }
+
+    VisitaDetalleSupervisor:
+      allOf:
+        - $ref: '#/components/schemas/VisitaResumenSupervisor'
+        - type: object
+          description: |
+            **Sin `siteRadioPermitidoMetros`**, a propósito. Ese número es el umbral con el
+            que se juzga al supervisor: saber que la geocerca son 150 m le dice exactamente
+            cuánto puede alejarse antes de que la evidencia salga marcada.
+
+            La dirección y las coordenadas sí van: tiene que llegar hasta la sede, y saber
+            dónde está no le dice nada sobre el veredicto.
+          required: [siteLat, siteLng, siteDireccion, checklist]
+          properties:
+            siteDireccion: { type: string }
+            siteLat: { type: number, format: double }
+            siteLng: { type: number, format: double }
+            iniciadaEn: { type: string, format: date-time, nullable: true }
+            observaciones: { type: string, nullable: true }
+            checklist:
+              type: array
+              items: { $ref: '#/components/schemas/ChecklistItem' }
+            evidencias:
+              type: array
+              description: |
+                Sólo confirmación de registro. Sin hash (le permitiría enumerar los suyos
+                para clonarlos), sin URL de foto y sin veredicto.
+              items: { $ref: '#/components/schemas/EvidenciaConfirmacion' }
+
+    VisitaDetalle:
+      description: Vista de administrador. Incluye el veredicto y el umbral de geocerca.
+      allOf:
+        - $ref: '#/components/schemas/VisitaResumen'
+        - type: object
+          required: [siteLat, siteLng, siteRadioPermitidoMetros, siteDireccion, checklist]
+          properties:
+            siteDireccion: { type: string }
+            siteLat: { type: number, format: double }
+            siteLng: { type: number, format: double }
+            siteRadioPermitidoMetros: { type: number }
+            iniciadaEn: { type: string, format: date-time, nullable: true }
+            observaciones: { type: string, nullable: true }
+            checklist:
+              type: array
+              items: { $ref: '#/components/schemas/ChecklistItem' }
+            evidencias:
+              type: array
+              items: { $ref: '#/components/schemas/EvidenciaConfirmacion' }
+
+    VisitaDetalleAdmin:
+      allOf:
+        - $ref: '#/components/schemas/VisitaDetalle'
+        - type: object
+          required: [evidenciasCompletas, alertas]
+          properties:
+            evidenciasCompletas:
+              type: array
+              items: { $ref: '#/components/schemas/Evidencia' }
+            alertas:
+              type: array
+              description: Alertas agregadas de todas las evidencias, deduplicadas
+              items:
+                type: object
+                required: [motivo, conteo]
+                properties:
+                  motivo: { $ref: '#/components/schemas/MotivoAlerta' }
+                  conteo: { type: integer }
+                  descripcion: { type: string }
+
+    EvidenciaConfirmacion:
+      type: object
+      description: |
+        Todo lo que el supervisor recibe de una evidencia: que quedó registrada y con qué
+        hora de servidor. Sin veredicto, sin distancia y sin hash — ver la nota sobre las
+        dos vistas en la descripción de la API.
+      required: [id, visitId, timestampServidor]
+      properties:
+        id: { type: string }
+        visitId: { type: string }
+        timestampServidor: { type: string, format: date-time }
+
+    EvidenciaResumen:
+      type: object
+      description: Resumen con veredicto. Sólo aparece en respuestas de `/v1/admin`.
+      required: [id, timestampServidor, distanciaAlSitioMetros, esSospechosa]
+      properties:
+        id: { type: string }
+        timestampServidor: { type: string, format: date-time }
+        distanciaAlSitioMetros: { type: number }
+        esSospechosa: { type: boolean }
+
+    Evidencia:
+      type: object
+      required:
+        [id, visitId, siteId, supervisorId, hashSHA256, lat, lng,
+         distanciaAlSitioMetros, timestampServidor, esSospechosa, motivosAlerta, integrity]
+      properties:
+        id: { type: string }
+        visitId: { type: string }
+        siteId: { type: string }
+        supervisorId: { type: string }
+        fotoUrl:
+          type: string
+          nullable: true
+          description: URL firmada, vigencia 15 min. Sólo para admin.
+        hashSHA256: { type: string, minLength: 64, maxLength: 64 }
+        lat: { type: number, format: double }
+        lng: { type: number, format: double }
+        precisionMetros: { type: number, nullable: true }
+        distanciaAlSitioMetros: { type: number }
+        timestampServidor: { type: string, format: date-time }
+        timestampCliente:
+          type: string
+          format: date-time
+          nullable: true
+          description: Reloj del dispositivo. Auditoría, no decide nada.
+        mockLocationReportada: { type: boolean }
+        esSospechosa: { type: boolean }
+        motivosAlerta:
+          type: array
+          items: { $ref: '#/components/schemas/MotivoAlerta' }
+        integrity:
+          type: object
+          required: [veredicto]
+          properties:
+            veredicto: { $ref: '#/components/schemas/VeredictoIntegridad' }
+            deviceRecognition:
+              type: array
+              items: { type: string }
+            appRecognition: { type: string, nullable: true }
+            motivo: { type: string, nullable: true }
+
+    Reporte:
+      type: object
+      required: [clienteId, desde, hasta, resumen, porSede]
+      properties:
+        clienteId: { type: string }
+        nombreCliente: { type: string }
+        desde: { type: string, format: date-time }
+        hasta: { type: string, format: date-time }
+        generadoEn: { type: string, format: date-time }
+        resumen:
+          type: object
+          required: [visitasAsignadas, visitasCompletadas, evidenciasTotales, evidenciasSospechosas]
+          properties:
+            visitasAsignadas: { type: integer }
+            visitasCompletadas: { type: integer }
+            visitasPendientes: { type: integer }
+            cumplimientoPorcentaje:
+              type: number
+              description: completadas / asignadas * 100, redondeado a 1 decimal
+            evidenciasTotales: { type: integer }
+            evidenciasSospechosas: { type: integer }
+            motivosFrecuentes:
+              type: array
+              items:
+                type: object
+                properties:
+                  motivo: { $ref: '#/components/schemas/MotivoAlerta' }
+                  conteo: { type: integer }
+        porSede:
+          type: array
+          items:
+            type: object
+            required: [siteId, nombreSede, visitasAsignadas, visitasCompletadas]
+            properties:
+              siteId: { type: string }
+              nombreSede: { type: string }
+              visitasAsignadas: { type: integer }
+              visitasCompletadas: { type: integer }
+              evidenciasSospechosas: { type: integer }

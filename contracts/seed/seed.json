@@ -1,0 +1,135 @@
+{
+  "_nota": "Datos demo para el emulador de Firestore y para los tests de integración del backend. Coordenadas reales de Bogotá para que la geocerca sea comprobable con el mock GPS del emulador Android. Las passwords son de desarrollo — el script de seed se niega a correr contra un proyecto que no sea el emulador.",
+
+  "users": [
+    {
+      "id": "u_admin",
+      "nombre": "Ana Restrepo",
+      "email": "admin@verificlean.test",
+      "password": "Verifi2026!",
+      "rol": "admin",
+      "deviceId": null,
+      "activo": true
+    },
+    {
+      "id": "u_sup_1",
+      "nombre": "Carlos Muñoz",
+      "email": "carlos@verificlean.test",
+      "password": "Verifi2026!",
+      "rol": "supervisor",
+      "deviceId": null,
+      "activo": true
+    },
+    {
+      "id": "u_sup_2",
+      "nombre": "Diana Ortiz",
+      "email": "diana@verificlean.test",
+      "password": "Verifi2026!",
+      "rol": "supervisor",
+      "deviceId": null,
+      "activo": true
+    },
+    {
+      "id": "u_sup_inactivo",
+      "nombre": "Pedro Lasso",
+      "email": "pedro@verificlean.test",
+      "password": "Verifi2026!",
+      "rol": "supervisor",
+      "deviceId": null,
+      "activo": false
+    }
+  ],
+
+  "sites": [
+    {
+      "id": "site_torre_bavaria",
+      "clienteId": "cli_bavaria",
+      "nombreCliente": "Bavaria S.A.",
+      "nombreSede": "Torre Bavaria - Piso 12",
+      "direccion": "Cra 53 A #127-35, Bogotá",
+      "lat": 4.700543,
+      "lng": -74.063644,
+      "radioPermitidoMetros": 150,
+      "activo": true
+    },
+    {
+      "id": "site_cc_andino",
+      "clienteId": "cli_andino",
+      "nombreCliente": "Centro Comercial Andino",
+      "nombreSede": "Andino - Zona de comidas",
+      "direccion": "Cra 11 #82-71, Bogotá",
+      "lat": 4.667209,
+      "lng": -74.05372,
+      "radioPermitidoMetros": 120,
+      "activo": true
+    },
+    {
+      "id": "site_clinica_country",
+      "clienteId": "cli_country",
+      "nombreCliente": "Clínica del Country",
+      "nombreSede": "Country - Urgencias",
+      "direccion": "Cra 16 #82-57, Bogotá",
+      "lat": 4.668243,
+      "lng": -74.050126,
+      "radioPermitidoMetros": 80,
+      "activo": true
+    },
+    {
+      "id": "site_bodega_fontibon",
+      "clienteId": "cli_bavaria",
+      "nombreCliente": "Bavaria S.A.",
+      "nombreSede": "Bodega Fontibón",
+      "direccion": "Cl 17 #96-40, Bogotá",
+      "lat": 4.669121,
+      "lng": -74.14382,
+      "radioPermitidoMetros": 250,
+      "activo": true
+    }
+  ],
+
+  "checklistPorDefecto": [
+    { "id": "banos", "pregunta": "¿Baños limpios y con dotación completa?", "respuesta": null, "nota": null },
+    { "id": "pisos", "pregunta": "¿Pisos barridos y trapeados?", "respuesta": null, "nota": null },
+    { "id": "residuos", "pregunta": "¿Puntos ecológicos vaciados y separados?", "respuesta": null, "nota": null },
+    { "id": "insumos", "pregunta": "¿Insumos suficientes para el turno?", "respuesta": null, "nota": null },
+    { "id": "uniforme", "pregunta": "¿Personal con uniforme y EPP completo?", "respuesta": null, "nota": null }
+  ],
+
+  "visits": [
+    {
+      "id": "visit_demo_1",
+      "siteId": "site_torre_bavaria",
+      "supervisorId": "u_sup_1",
+      "estado": "pendiente",
+      "diasDesdeHoy": 0
+    },
+    {
+      "id": "visit_demo_2",
+      "siteId": "site_cc_andino",
+      "supervisorId": "u_sup_1",
+      "estado": "pendiente",
+      "diasDesdeHoy": 0
+    },
+    {
+      "id": "visit_demo_3",
+      "siteId": "site_clinica_country",
+      "supervisorId": "u_sup_2",
+      "estado": "pendiente",
+      "diasDesdeHoy": 1
+    },
+    {
+      "id": "visit_demo_4",
+      "siteId": "site_bodega_fontibon",
+      "supervisorId": "u_sup_2",
+      "estado": "pendiente",
+      "diasDesdeHoy": -1
+    },
+    {
+      "id": "visit_demo_5",
+      "siteId": "site_torre_bavaria",
+      "supervisorId": "u_sup_1",
+      "estado": "pendiente",
+      "diasDesdeHoy": -3
+    }
+  ]
+}

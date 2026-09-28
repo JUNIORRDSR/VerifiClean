@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// VerifiClean — Cloud Storage.
+//
+// Las fotos de evidencia las sube el backend con el Admin SDK, no el cliente:
+// el servidor necesita los bytes en la mano para calcular el SHA-256 real. Si el
+// cliente subiera directo a Storage, el hash quedaría bajo su control y la
+// detección de imagen duplicada se vuelve decorativa.
+//
+// Por eso: cero escritura desde cliente. La lectura del admin también pasa por la
+// API (URLs firmadas de vida corta), así que aquí todo queda cerrado.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

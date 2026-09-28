@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pin de ubicación con un check dentro: sitio verificado. El contenido se mantiene
+     dentro de los 72dp centrales del lienzo de 108dp, que es la zona segura de un
+     icono adaptativo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,26c-9.94,0 -18,8.06 -18,18 0,13.5 18,34 18,34s18,-20.5 18,-34c0,-9.94 -8.06,-18 -18,-18z" />
+    <path
+        android:fillColor="#0F5C4A"
+        android:pathData="M52.2,52.6l-7.4,-7.4 3.1,-3.1 4.3,4.3 10.9,-10.9 3.1,3.1z" />
+</vector>

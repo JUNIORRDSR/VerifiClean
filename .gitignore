@@ -1,0 +1,35 @@
+# --- Node / backend ---
+node_modules/
+backend/dist/
+backend/coverage/
+*.log
+*.err
+.env
+.env.local
+.env.*.local
+
+# --- Android ---
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.cxx/
+*.iml
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# --- Secretos ---
+# El google-services.json de producción no va al repo. El de desarrollo tampoco:
+# aunque no contiene claves privadas, sí identifica el proyecto GCP.
+android/app/google-services.json
+credenciales*.json
+service-account*.json

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VerifiClean</string>
+
+    <!-- Login -->
+    <string name="login_titulo">VerifiClean</string>
+    <string name="login_subtitulo">Verificación de supervisión en sitio</string>
+    <string name="login_email">Correo</string>
+    <string name="login_password">Contraseña</string>
+    <string name="login_entrar">Entrar</string>
+    <string name="login_error_credenciales">Correo o contraseña incorrectos.</string>
+
+    <!-- Visitas -->
+    <string name="visitas_titulo">Mis visitas</string>
+    <string name="visitas_vacio">No tienes visitas asignadas.</string>
+    <string name="visita_estado_pendiente">Pendiente</string>
+    <string name="visita_estado_en_progreso">En progreso</string>
+    <string name="visita_estado_completada">Completada</string>
+    <string name="visita_evidencias">%1$d evidencia(s)</string>
+    <string name="visita_tomar_foto">Tomar evidencia</string>
+    <string name="visita_completar">Completar visita</string>
+    <string name="visita_checklist">Checklist</string>
+    <string name="visita_observaciones">Observaciones</string>
+
+    <!-- Captura -->
+    <string name="captura_titulo">Evidencia fotográfica</string>
+    <string name="captura_disparar">Capturar</string>
+    <string name="captura_obteniendo_ubicacion">Obteniendo ubicación…</string>
+    <string name="captura_sin_permiso_camara">Se necesita permiso de cámara para registrar la evidencia.</string>
+    <string name="captura_sin_permiso_ubicacion">Se necesita permiso de ubicación para validar que estás en la sede.</string>
+    <string name="captura_conceder">Conceder permiso</string>
+    <string name="captura_guardada">Evidencia guardada. Está a salvo aunque cierres la app y se enviará cuando haya conexión.</string>
+
+    <!-- Admin -->
+    <string name="admin_titulo">Panel de control</string>
+    <string name="admin_filtro_sospechosas">Solo sospechosas</string>
+    <string name="admin_sin_resultados">No hay visitas con estos filtros.</string>
+    <string name="admin_alertas">Alertas</string>
+    <string name="admin_evidencias">Evidencias</string>
+
+    <!-- Sincronización -->
+    <string name="sync_pendientes">%1$d evidencia(s) por enviar</string>
+    <string name="sync_reintentar">Reintentar envío</string>
+    <string name="sync_todo_enviado">Todo sincronizado</string>
+
+    <!-- Errores -->
+    <string name="error_red">Sin conexión. Se reintentará automáticamente.</string>
+    <string name="error_generico">Algo salió mal. Intenta de nuevo.</string>
+    <string name="reintentar">Reintentar</string>
+    <string name="cerrar_sesion">Cerrar sesión</string>
+
+    <!-- Rediseño: se añaden claves; las existentes permanecen estables para los tests. -->
+    <string name="visitas_vacio_ayuda">Las nuevas asignaciones aparecerán aquí cuando actualices.</string>
+    <string name="visitas_actualizando">Actualizando visitas…</string>
+    <string name="visitas_ultima_actualizacion">Última consulta: %1$s</string>
+</resources>

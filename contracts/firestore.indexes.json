@@ -1,0 +1,144 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "supervisorId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "supervisorId", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tieneSospechosas", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "tieneSospechosas", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteClienteId", "order": "ASCENDING" },
+        { "fieldPath": "fechaAsignada", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "rol", "order": "ASCENDING" },
+        { "fieldPath": "nombre", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "nombreSede", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "nombreSede", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "evidences",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteEvidenciaId", "order": "ASCENDING" },
+        { "fieldPath": "visitId", "order": "ASCENDING" },
+        { "fieldPath": "supervisorId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "evidences",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visitId", "order": "ASCENDING" },
+        { "fieldPath": "timestampServidor", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "evidences",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "esSospechosa", "order": "ASCENDING" },
+        { "fieldPath": "timestampServidor", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clienteId", "order": "ASCENDING" },
+        { "fieldPath": "nombreSede", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "evidences",
+      "fieldPath": "hashSHA256",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" }
+      ]
+    },
+    {
+      "collectionGroup": "visits",
+      "fieldPath": "checklist",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "evidences",
+      "fieldPath": "checklistSnapshot",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "evidences",
+      "fieldPath": "integrity",
+      "indexes": []
+    }
+  ]
+}
